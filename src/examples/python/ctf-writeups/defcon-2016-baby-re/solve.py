@@ -33,7 +33,25 @@
 
 import sys
 from triton import *
+class test(object):
+    def __init__(self):
+        print "init"
+    def callback(self, mem):
+        global memoryCache
 
+        addr = mem.getAddress()
+        size = mem.getSize()
+        for index in range(size):
+            if not isMemoryMapped(addr+index):
+                for r in memoryCache:
+                    if addr+index >= r['start'] and addr+index < r['start'] + r['size']:
+                        value = ord(r['memory'][((addr+index)-r['start'])])
+                        setConcreteMemoryValue(addr+index, value)
+                        return
+
+        return
+
+t = test()
 # Symbolic variables with random inputs at the first iteration.
 variables = {
     0x00: 61,
@@ -262,7 +280,7 @@ def initialize():
     enableMode(MODE.ONLY_ON_SYMBOLIZED, True)
 
     # Define internal callbacks.
-    addCallback(memoryCaching,   CALLBACK.GET_CONCRETE_MEMORY_VALUE)
+    addCallback(t.callback,   CALLBACK.GET_CONCRETE_MEMORY_VALUE)
     addCallback(constantFolding, CALLBACK.SYMBOLIC_SIMPLIFICATION)
 
     # Load the meory dump

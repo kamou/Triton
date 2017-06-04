@@ -741,6 +741,7 @@ namespace triton {
 
         /* Extract arguments */
         PyArg_ParseTuple(args, "|OO", &function, &mode);
+        printf("type: %s\n", Py_TYPE(function)->tp_name);
 
         /* Check if the architecture is definied */
         if (triton::api.getArchitecture() == triton::arch::ARCH_INVALID)
@@ -759,19 +760,39 @@ namespace triton {
               triton::api.addCallback(callbacks::getConcreteMemoryValueCallback([function](triton::arch::MemoryAccess& mem) {
                 /********* Lambda *********/
                 /* Create function args */
-                PyObject* args = triton::bindings::python::xPyTuple_New(1);
-                PyTuple_SetItem(args, 0, triton::bindings::python::PyMemoryAccess(mem));
+                if (PyMethod_Check(function)) {
+                    PyObject* function_self = PyMethod_Self(function);
+                    PyObject* args = triton::bindings::python::xPyTuple_New(2);
+                    PyTuple_SetItem(args, 0, function_self);
+                    PyTuple_SetItem(args, 1, triton::bindings::python::PyMemoryAccess(mem));
 
-                /* Call the callback */
-                PyObject* ret = PyObject_CallObject(function, args);
+                    /* Call the callback */
+                    PyObject* func = PyMethod_Function(function);
+                    PyObject* ret = PyObject_CallObject(func, args);
 
-                /* Check the call */
-                if (ret == nullptr) {
-                  PyErr_Print();
-                  throw triton::exceptions::Callbacks("Callbacks::processCallbacks(GET_CONCRETE_MEMORY_VALUE): Fail to call the python callback.");
+                    /* Check the call */
+                    if (ret == nullptr) {
+                      PyErr_Print();
+                      throw triton::exceptions::Callbacks("Callbacks::processCallbacks(GET_CONCRETE_MEMORY_VALUE): Fail to call the python callback.");
+                    }
+
+                    Py_DECREF(args);
+
+                } else {
+                    PyObject* args = triton::bindings::python::xPyTuple_New(1);
+                    PyTuple_SetItem(args, 0, triton::bindings::python::PyMemoryAccess(mem));
+
+                    /* Call the callback */
+                    PyObject* ret = PyObject_CallObject(function, args);
+
+                    /* Check the call */
+                    if (ret == nullptr) {
+                      PyErr_Print();
+                      throw triton::exceptions::Callbacks("Callbacks::processCallbacks(GET_CONCRETE_MEMORY_VALUE): Fail to call the python callback.");
+                    }
+
+                    Py_DECREF(args);
                 }
-
-                Py_DECREF(args);
                 /********* End of lambda *********/
               }, function));
               break;
